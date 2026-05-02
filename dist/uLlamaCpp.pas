@@ -401,6 +401,7 @@ begin
     ProcessPostedMessage;
     Sleep(250);
   until (__LibInterface_InvokeLibProc(LibGUID, 0, 'TTE', Args));
+  ProcessPostedMessage;
 end;
 
 procedure TLlama.UnloadModel;

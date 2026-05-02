@@ -70,12 +70,14 @@ procedure ResetContext(
   var ModelInfo: TModelInfo; 
   var State: TChatState
 );
+var 
+  ContextParams: TLlamaInstance.llama_context_params;
 begin
   LlamaInstance.llama_free(ModelInfo.Context);
 
   ModelInfo.Context := LlamaInstance.llama_init_from_model(
     ModelInfo.Model,
-    LlamaInstance.llama_context_default_params
+    ModelInfo.ContextParams
   );
 
   State.Tokens := [];
@@ -109,7 +111,7 @@ begin
     Result.logits[i] := 0;
   end;
 
-  // logits solo sull'ultimo token
+  // logits only for last token
   Result.logits[N - 1] := 1;
   Result.n_tokens := N;
 end;
@@ -235,9 +237,9 @@ begin
       MsgArray[i].Content := PAnsiChar(Contents[i]);
     end;
 
-  // 1. Ottieni dimensione necessaria
+  // 1. Get needed dimension
   Needed := LlamaInstance.llama_chat_apply_template(
-    nil, // usa template del modello
+    nil, // Use model template
     @MsgArray[0],
     Length(MsgArray),
     True,
@@ -248,11 +250,11 @@ begin
   if Needed <= 0 then
     raise Exception.Create('Errore nel template');
 
-  // 2. Alloca buffer
+  // 2. Allocate buffer
   GetMem(Buffer, Needed);
 
   try
-    // 3. Genera prompt
+    // 3. Generate prompt
     LlamaInstance.llama_chat_apply_template(
       nil,
       @MsgArray[0],
@@ -278,12 +280,11 @@ begin
         try
           Result := ApplyChatTemplateNative(ModelInfo.Model, Messages);
 
-          // protezione: output vuoto ? fallback
           if Result.Trim = '' then
             raise Exception.Create('Template vuoto');
 
         except
-          // fallback automatico
+          // fallback
           Result := ApplyFallbackTemplate(Messages);
         end;
       end;
@@ -316,13 +317,13 @@ var
 begin
   ctxSize := LlamaInstance.llama_n_ctx(ModelInfo.Context);
 
-  // spazio riservato alla generazione
+  // Space reserved for generation
   Budget := Max(ctxSize - Params.MaxGenTokens,ctxSize - Params.MinGenTokens);
 
   TempMessages := [];
   HasSystem := False;
 
-  // 1. estrai SYSTEM (una sola volta)
+  // 1. extract SYSTEM (only once)
   for var Msg in Messages do
     begin
       if Msg.Role = crSystem then
@@ -333,7 +334,7 @@ begin
       end;
     end;
 
-  // 2. parto SEMPRE dall'ultimo messaggio (di solito USER)
+  // 2. ALWAYS start from the last message (usually USER)
   i := High(Messages);
 
   while i >= 0 do
@@ -344,10 +345,10 @@ begin
           Continue;
         end;
 
-      // BLOCCO LOGICO: user + assistant
+      // Logic block: user + assistant
       if (Messages[i].Role = crAssistant) and (i > 0) and (Messages[i-1].Role = crUser) then
         begin
-          // prova ad aggiungere la coppia
+          // try adding the pair
           var Candidate := [Messages[i-1], Messages[i]] + TempMessages;
 
           if HasSystem then
@@ -364,7 +365,7 @@ begin
         end
       else
         begin
-          // messaggio singolo (tipicamente ultimo USER)
+          // single message (typically last USER)
           var Candidate := [Messages[i]] + TempMessages;
 
           if HasSystem then
@@ -381,11 +382,11 @@ begin
         end;
     end;
 
-  // 3. prepend SYSTEM alla fine (garantito in testa)
+  // 3. prepend SYSTEM at the end (guaranteed in the head)
   if HasSystem then
     TempMessages := [SystemMsg] + TempMessages;
 
-  // 4. prompt finale
+  // 4. final prompt
   Result := ApplyChatTemplateSafe(ModelInfo, TempMessages);
 end;
 
@@ -397,7 +398,7 @@ var
   Batch: TLlamaInstance.llama_batch;
   ReturnValue: Integer;
 begin
-  // Prefill parte SEMPRE da posizione 0
+  // Prefill ALWAYS starts from position 0
   Batch := CreateBatch(Tokens, 0);
 
   ReturnValue := LlamaInstance.llama_decode(ModelInfo.Context, Batch);
@@ -512,13 +513,13 @@ var
   i: Integer;
   MaxLogit, Sum: Double;
 begin
-  // trova max per stabilità numerica
+  // find max for numerical stability
   MaxLogit := Candidates.data[0].logit;
   for i := 1 to Candidates.size - 1 do
     if Candidates.data[i].logit > MaxLogit then
       MaxLogit := Candidates.data[i].logit;
 
-  // exp normalizzata
+  // normalized exp
   Sum := 0.0;
   for i := 0 to Candidates.size - 1 do
   begin
@@ -526,7 +527,7 @@ begin
     Sum := Sum + Candidates.data[i].p;
   end;
 
-  // normalizzazione
+  // normalization
   for i := 0 to Candidates.size - 1 do
     Candidates.data[i].p := Candidates.data[i].p / Sum;
 end;
@@ -539,7 +540,7 @@ begin
   if (K <= 0) or (K >= Candidates.size) then
     Exit;
 
-  // crea vista array sulla memoria C
+  // create array view on C memory
   SetLength(Arr, Candidates.size);
   Move(Candidates.data^[0], Arr[0], Candidates.size *
     SizeOf(TLlamaInstance.llama_token_data));
@@ -552,7 +553,7 @@ begin
       Result := CompareValue(R.p, L.p);
     end));
 
-  // copia indietro
+  // back copy
   Move(Arr[0], Candidates.data^[0], Candidates.size *
     SizeOf(TLlamaInstance.llama_token_data));
 
@@ -572,12 +573,11 @@ begin
   if Candidates.size <= 1 then
     Exit;
 
-  // Copia in array Delphi
   SetLength(Arr, Candidates.size);
   Move(Candidates.data^[0], Arr[0], Candidates.size *
     SizeOf(TLlamaInstance.llama_token_data));
 
-  // sort per probabilità decrescente
+  // sort by decreasing probability
   TArray.Sort<TLlamaInstance.llama_token_data>(Arr,
     TComparer<TLlamaInstance.llama_token_data>.Construct(
     function(const L, R: TLlamaInstance.llama_token_data): Integer
@@ -585,7 +585,7 @@ begin
       Result := CompareValue(R.p, L.p);
     end));
 
-  // cumulativa
+  // cumulative
   CumProb := 0.0;
 
   for i := 0 to High(Arr) do
@@ -599,7 +599,7 @@ begin
     end;
   end;
 
-  // copia indietro (solo i primi Candidates.size elementi)
+  // copy back (only the first Candidates.size elements)
   Move(Arr[0], Candidates.data^[0], Candidates.size *
     SizeOf(TLlamaInstance.llama_token_data));
 end;
@@ -648,7 +648,6 @@ begin
 
   VocabSize := LlamaInstance.llama_vocab_n_tokens(ModelInfo.Vocab);
 
-  // allocazione corretta memoria
   GetMem(Candidates.data, VocabSize * SizeOf(TLlamaInstance.llama_token_data));
   Arr := Candidates.data;
 
@@ -682,7 +681,6 @@ begin
     Result := SampleFromDistribution(Candidates);
 
   finally
-    // libera memoria
     FreeMem(Candidates.data);
   end;
 end;
@@ -728,7 +726,7 @@ begin
       Inc(State.n_past);
       State.Tokens := State.Tokens + [Token];
 
-      // 4. conversione token
+      // 4. token conversion
       Piece := TokenToString(ModelInfo, Token, false);
 
       if Assigned(OnToken) then
@@ -753,7 +751,7 @@ begin
       Exit(True);
   end;
 
-  // se lunghezze diverse ? differiscono
+  // if different lengths then they differ
   Result := Length(A) <> Length(B);
 end;
 
@@ -790,10 +788,10 @@ var
 begin
   State.Prefill := True;
 
-  // 1. Token cache per messaggi
+  // 1. Message cache token
   EnsureAllMessagesTokenized(Messages, ModelInfo);
 
-  // 2. Costruzione prompt (con context window mgmt incluso)
+  // 2. Prompt construction (with context window mgmt included)
   Prompt := BuildFittedPrompt(ModelInfo, Messages, Params);
 
   // 3. Hash prompt (cache)
@@ -801,10 +799,10 @@ begin
 
   if PromptHash <> State.LastPromptHash then
     begin
-      // 4. Tokenizzazione UNA SOLA VOLTA
+      // 4. Tokenization ONLY ONCE
       Tokens := Tokenize(ModelInfo, Prompt, True, True);
 
-      // 5. Gestione del contesto
+      // 5. Context Management
       PrefixLen := CommonPrefixLength(State.Tokens, Tokens);
 
       NeedReset := (PrefixLen = 0) or (PrefixLen <> Length(State.Tokens));
@@ -818,7 +816,7 @@ begin
         end
       else
         begin
-          // append puro
+          // pure append
           DeltaTokens := Copy(Tokens, PrefixLen, Length(Tokens) - PrefixLen);
           AppendToContext(ModelInfo.Context, DeltaTokens, State);
         end;
@@ -826,7 +824,7 @@ begin
       State.LastPromptHash := PromptHash;
     end;
 
-  // 6. Generazione
+  // 6. Generation
   StopSeq := ExtractStopSequences(ModelInfo);
 
   Result := GenerateWithAdvancedSampling(
@@ -860,10 +858,10 @@ begin
 
   if PromptHash <> State.LastPromptHash then
     begin
-      // 2. Tokenizzazione
+      // 2. Tokenization
       Tokens := Tokenize(ModelInfo, Prompt, True, True);
 
-      // 3. Context reuse (identico a ChatCompletion)
+      // 3. Context reuse
       PrefixLen := CommonPrefixLength(State.Tokens, Tokens);
 
       NeedReset := (PrefixLen = 0) or (PrefixLen <> Length(State.Tokens));
@@ -885,7 +883,7 @@ begin
   // 4. Stop sequences
   StopSeq := ExtractStopSequences(ModelInfo);
 
-  // 5. Generazione
+  // 5. Generation
   Result := GenerateWithAdvancedSampling(
     ModelInfo,
     State,

@@ -15,6 +15,7 @@ type
     Vocab: TLlamaInstance.llama_vocab;
     TemplateMode: TTemplateMode;
     RawTemplate: string;
+    ContextParams: TLlamaInstance.llama_context_params;
   end;
 
 function LoadModelParams: TLlamaInstance.llama_model_params;
@@ -99,6 +100,8 @@ begin
   if (not Assigned(Result.Context)) then
     RaiseException('Init context error');
 
+  Result.ContextParams:=ContextParams;
+
   Result.Vocab := LlamaInstance.llama_model_get_vocab(Result.Model);
 
   if (not Assigned(Result.Vocab)) then
@@ -113,14 +116,16 @@ end;
 procedure UnloadModel(var ModelInfo: TModelInfo);
 begin
   LlamaInstance.AddLogCallback(nil,nil);
-  try
-    LlamaInstance.llama_free(ModelInfo.Context);
-  except
-  end;
-  try
-    LlamaInstance.llama_free_model(ModelInfo.Model);
-  except
-  end;
+  if (Assigned(ModelInfo.Context)) then
+    try
+      LlamaInstance.llama_free(ModelInfo.Context);
+    except
+    end;
+  if (Assigned(ModelInfo.Model)) then
+    try
+      LlamaInstance.llama_free_model(ModelInfo.Model);
+    except
+    end;
   ModelInfo:=Default(TModelInfo);
 end;
 
