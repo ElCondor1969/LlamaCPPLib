@@ -15,8 +15,9 @@ uses
   uLibInterface,
   uUtility,
   uLlamaCPPBinding,
-  uLLamaCPPLibBase,
-  uLlamaCPPCompletation;
+  uLlamaCPPLibBase,
+  uLlamaCPPCompletation,
+  uLlamaCPPEmbeddings;
 
 {$R *.res}
 
@@ -252,6 +253,16 @@ begin
         VarToBoolean(Args[1])
       ));
     end
+  else if (SameText(ProcName,'TKNEMB')) then
+    begin
+      var Vector: TArray<Single> := GetTokenEmbedding(
+        ModelInfo,
+        Args[0]
+      );
+      DynArrayToVariant(Result,Pointer(Vector),TypeInfo(TArray<Single>));
+    end
+  else if (SameText(ProcName,'VOCSIZE')) then
+    Result:=IntToStr(GetVocabSize(ModelInfo))
   else
     RaiseException('Proc "%s" unknown',[ProcName]);
 end;

@@ -396,6 +396,18 @@ Converts a token array back to text.
 
 ---
 
+#### `GetTokenEmbedding`
+
+```pascal
+function GetTokenEmbedding(Token: integer): TFloatArray;
+```
+
+Returns the embedding vector for the specified token.
+
+To use this function, the model must be loaded with the *Embeddings* property of the *LlamaContextParams* settings property set to *true*.
+
+---
+
 #### `StartCompletation`
 
 ```pascal
@@ -424,6 +436,7 @@ Performs chat-style completion using structured conversation data.
 | ----------------------- | ---------------------- | ---------------------------- |
 | `ModelPath`             | string (read-only)     | Path of the loaded model     |
 | `Settings`              | `TLlamaSettings`       | Configuration settings       |
+| `VocabSize`             | `Integer`              | Number of model's tokens     |
 | `OnLogCallback`         | `TLLamaLogCallback`    | Log callback (object method) |
 | `OnLogCallback2`        | `TLLamaLogCallback2`   | Log callback (static)        |
 | `OnTokenCallback`       | `TLlamaTokenCallback`  | Token streaming callback     |

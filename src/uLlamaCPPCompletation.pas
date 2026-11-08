@@ -94,7 +94,7 @@ begin
   N := Length(Tokens);
 
   if N = 0 then
-    raise Exception.Create('CreateBatch: Tokens vuoto');
+    raise Exception.Create('CreateBatch: Tokens is empty');
 
   Result := LlamaInstance.llama_batch_init(N, 0, 1);
 

@@ -251,9 +251,10 @@ type
       sorted: Boolean;
     end;
 
-    llama_model   = Pointer;
+    llama_model = Pointer;
     llama_context = Pointer;
-    llama_vocab   = Pointer;
+    llama_vocab = Pointer;
+    llama_memory_t = Pointer;
 
     llama_model_params = record
       devices: Pointer;
@@ -358,7 +359,7 @@ type
       ctx: llama_context
     ); cdecl;
 
-    TLlama_free_model = procedure(
+    TLlama_model_free = procedure(
       model: llama_model
     ); cdecl;
 
@@ -396,8 +397,28 @@ type
       i: Int32
     ): llama_logit_array; cdecl;
 
+    TLlama_get_embeddings_ith = function(
+      ctx: llama_context;
+      i: Int32
+    ): PSingle; cdecl;
+
+    TLlama_get_memory = function(
+      ctx: llama_context
+    ): llama_memory_t; cdecl;
+
+    TLlama_memory_seq_rm = function(
+      mem: llama_memory_t;
+      seq_id: llama_seq_id;
+      p0: llama_pos;
+      p1: llama_pos
+    ): Boolean; cdecl;
+
     TLlama_vocab_n_tokens = function(
       vocab: llama_vocab
+    ): Int32; cdecl;
+
+    TLlama_model_n_embd = function(
+      model: llama_model
     ): Int32; cdecl;
 
     TLlama_token_to_piece = function(
@@ -453,14 +474,18 @@ type
     llama_model_get_vocab: TLlama_model_get_vocab;
     llama_init_from_model: TLlama_init_from_model;
     llama_free: TLlama_free;
-    llama_free_model: TLlama_free_model;
+    llama_model_free: TLlama_model_free;
     llama_n_ctx: TLlama_n_ctx;
     llama_tokenize: TLlama_tokenize;
     llama_batch_init: TLlama_batch_init;
     llama_batch_free: TLlama_batch_free;
     llama_decode: TLlama_decode;
     llama_get_logits_ith: TLlama_get_logits_ith;
+    llama_get_embeddings_ith: TLlama_get_embeddings_ith;
+    llama_get_memory: TLlama_get_memory;
+    llama_memory_seq_rm: TLlama_memory_seq_rm;
     llama_vocab_n_tokens: TLlama_vocab_n_tokens;
+    llama_model_n_embd: TLlama_model_n_embd;
     llama_token_to_piece: TLlama_token_to_piece;
     llama_log_set: Tllama_log_set;
     llama_model_meta_val_str: TLlama_model_meta_val_str;
@@ -523,7 +548,7 @@ begin
   @ggml_backend_load_all:=GetProcAddress(FHandleGgmlLib,'ggml_backend_load_all');
   @llama_backend_init:=GetProcAddress(FHandleLLamaLib,'llama_backend_init');
   @llama_max_devices:=GetProcAddress(FHandleLLamaLib,'llama_max_devices');
-  @llama_free:=GetProcAddress(FHandleLLamaLib,'llama_free');
+  @llama_model_free:=GetProcAddress(FHandleLLamaLib,'llama_model_free');
   @llama_model_meta_val_str:=GetProcAddress(FHandleLLamaLib,'llama_model_meta_val_str');
   @llama_model_default_params:=GetProcAddress(FHandleLLamaLib,'llama_model_default_params');
   @llama_model_load_from_file:=GetProcAddress(FHandleLLamaLib,'llama_model_load_from_file');
@@ -538,7 +563,11 @@ begin
   @llama_encode:=GetProcAddress(FHandleLLamaLib,'llama_encode');
   @llama_decode:=GetProcAddress(FHandleLLamaLib,'llama_decode');
   @llama_get_logits_ith:=GetProcAddress(FHandleLLamaLib,'llama_get_logits_ith');
+  @llama_get_embeddings_ith:=GetProcAddress(FHandleLLamaLib,'llama_get_embeddings_ith');
+  @llama_memory_seq_rm:=GetProcAddress(FHandleLLamaLib,'llama_memory_seq_rm');
+  @llama_get_memory:=GetProcAddress(FHandleLLamaLib,'llama_get_memory');
   @llama_vocab_n_tokens:=GetProcAddress(FHandleLLamaLib,'llama_vocab_n_tokens');
+  @llama_model_n_embd:=GetProcAddress(FHandleLLamaLib,'llama_model_n_embd');
   @llama_vocab_eos:=GetProcAddress(FHandleLLamaLib,'llama_vocab_eos');
   @llama_token_to_piece:=GetProcAddress(FHandleLLamaLib,'llama_token_to_piece');
   @llama_log_set:=GetProcAddress(FHandleLLamaLib,'llama_log_set');

@@ -196,6 +196,7 @@ type
     FOnGenerationComplete: TLlamaNotifyEvent;
     FOnGenerationComplete2: TLlamaNotifyEvent2;
     function GetModelPath: string;
+    function GetVocabSize: integer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -206,8 +207,10 @@ type
     function Detokenize(Tokens: TIntegerArray; IncludeSpecial: Boolean = true): string; overload;
     function StartCompletation(const Prompt: string): string;
     procedure StartChatCompletation(var InfoChat: TInfoChat);
+    function GetTokenEmbedding(Token: integer): TFloatArray;
     property ModelPath: string read GetModelPath;
     property Settings: TLlamaSettings read FSettings write FSettings;
+    property VocabSize: integer read GetVocabSize;
     property OnLogCallback: TLLamaLogCallback read FOnLogCallback write FOnLogCallback;
     property OnLogCallback2: TLLamaLogCallback2 read FOnLogCallback2 write FOnLogCallback2;
     property OnTokenCallback: TLlamaTokenCallback read FOnTokenCallback write FOnTokenCallback;
@@ -474,6 +477,21 @@ begin
   Args.Push(__ArrayToVariant(Tokens));
   Args.Push(IncludeSpecial);
   Result:=__LibInterface_InvokeLibProc(LibGUID, 0, 'DTKS', Args);
+end;
+
+function TLlama.GetTokenEmbedding(Token: integer): TFloatArray;
+var
+  Args: TVariantArray;
+begin
+  Args.Push(Token);
+  Result:=__VariantToArray(__LibInterface_InvokeLibProc(LibGUID, 0, 'TKNEMB', Args)).Map(VarToFloat);
+end;
+
+function TLlama.GetVocabSize: integer;
+var
+  Args: TVariantArray;
+begin
+  Result:=VarToInt(__LibInterface_InvokeLibProc(LibGUID, 0, 'VOCSIZE', Args));
 end;
 
 initialization

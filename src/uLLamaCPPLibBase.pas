@@ -1,4 +1,4 @@
-unit uLLamaCPPLibBase;
+unit uLlamaCPPLibBase;
 
 interface
 
@@ -56,6 +56,8 @@ function CountTokens(
 function TokenToString(const ModelInfo: TModelInfo; Token: Int32; IncludeSpecial: Boolean = true): string;
 
 function TokensToString(const ModelInfo: TModelInfo; Tokens: TArray<Int32>; IncludeSpecial: Boolean = true): string;
+
+function GetVocabSize(const ModelInfo: TModelInfo): Integer;
 
 implementation
 
@@ -123,7 +125,7 @@ begin
     end;
   if (Assigned(ModelInfo.Model)) then
     try
-      LlamaInstance.llama_free_model(ModelInfo.Model);
+      LlamaInstance.llama_model_free(ModelInfo.Model);
     except
     end;
   ModelInfo:=Default(TModelInfo);
@@ -255,6 +257,11 @@ begin
   Result := '';
   for i := 0 to High(Tokens) do
     Result := Result + TokenToString(ModelInfo, Tokens[i], IncludeSpecial);
+end;
+
+function GetVocabSize(const ModelInfo: TModelInfo): Integer;
+begin
+  Result := LlamaInstance.llama_vocab_n_tokens(ModelInfo.Vocab);
 end;
 
 end.
